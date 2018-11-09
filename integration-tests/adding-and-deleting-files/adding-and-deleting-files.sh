@@ -1,6 +1,8 @@
 # make sure errors stop the script
 set -e
 
+alias patch-package="./node_modules/.bin/patch-package"
+
 echo "add patch-package"
 yarn add $1
 

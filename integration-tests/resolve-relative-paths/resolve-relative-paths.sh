@@ -1,5 +1,8 @@
 set -e
 
+alias patch-package="./node_modules/.bin/patch-package"
+alias replace="./node_modules/.bin/replace"
+
 echo 'Add patch-package'
 yarn add $1
 
