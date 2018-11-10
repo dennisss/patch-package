@@ -249,19 +249,29 @@ class PatchParser {
     } as PatchMutationPart
   }
 
-  private currentLineIsPartOfHunk(): boolean {
-    if (this.isEOF) {
-      return false
-    }
-    switch (this.currentLine[0]) {
-      case undefined:
-      case " ":
-      case "+":
-      case "-":
-      case "\\":
-        return true
-      default:
-        return false
+  private parseHunkSizeReducer(
+    {
+      originalLength,
+      patchedLength,
+    }: { originalLength: number; patchedLength: number },
+    { type, lines }: PatchMutationPart,
+  ) {
+    switch (type) {
+      case "insertion":
+        return {
+          originalLength,
+          patchedLength: patchedLength + lines.length,
+        }
+      case "context":
+        return {
+          originalLength: originalLength + lines.length,
+          patchedLength: patchedLength + lines.length,
+        }
+      case "deletion":
+        return {
+          originalLength: originalLength + lines.length,
+          patchedLength,
+        }
     }
   }
 
@@ -332,40 +342,17 @@ class PatchParser {
 
         this.nextLine()
 
+        let endSize = { originalLength: 0, patchedLength: 0 }
         while (
-          this.currentLineIsPartOfHunk() &&
-          !(this.isOneLineLeft && this.currentLine === "")
+          !(this.isOneLineLeft && this.currentLine === "") &&
+          (endSize.originalLength < header.original.length ||
+            endSize.patchedLength < header.patched.length)
         ) {
+          // TODO: This function may grab multiple more than one line and overflow the hunk header specified size
           const mutations = this.parsePatchMutationPart()
           hunkParts.push(mutations)
+          endSize = this.parseHunkSizeReducer(endSize, mutations)
         }
-
-        // verify hunk integrity
-        const endSize = hunkParts.reduce(
-          (
-            { originalLength, patchedLength },
-            { type, lines }: PatchMutationPart,
-          ) => {
-            switch (type) {
-              case "insertion":
-                return {
-                  originalLength,
-                  patchedLength: patchedLength + lines.length,
-                }
-              case "context":
-                return {
-                  originalLength: originalLength + lines.length,
-                  patchedLength: patchedLength + lines.length,
-                }
-              case "deletion":
-                return {
-                  originalLength: originalLength + lines.length,
-                  patchedLength,
-                }
-            }
-          },
-          { originalLength: 0, patchedLength: 0 },
-        )
 
         if (
           endSize.originalLength !== header.original.length ||
